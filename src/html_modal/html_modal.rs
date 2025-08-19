@@ -75,7 +75,22 @@ pub fn process_document<T>(
         let json_value: Value = serde_json::to_value(&modal).unwrap();
         let document = &dom.document;
 
-        inner_process_document(&dom, 0, document, None, &json_value, &Value::Null, &opts.unwrap());
+        match opts {
+            None => {
+                let default_opts = ParseOpts {
+                        tree_builder: TreeBuilderOpts {
+                            drop_doctype: true,
+                            ..Default::default()
+                        },
+                    ..Default::default()
+                };
+
+                inner_process_document(&dom, document, None, &json_value, &Value::Null, &default_opts);
+            }
+            Some(value) => {
+                inner_process_document(&dom, document, None, &json_value, &Value::Null, &value);
+            }
+        }
         
         let mut bytes = vec![];
         let document_clone: SerializableHandle = dom.document.clone().into();
@@ -86,8 +101,7 @@ pub fn process_document<T>(
     }
 
 fn inner_process_document(
-    dom: &RcDom, 
-    indent: usize, 
+    dom: &RcDom,
     handle: &Handle,
     parent_children: Option<&mut RefMut<'_, Vec<Rc<Node>>>>,
     modal: &Value, 
@@ -121,47 +135,7 @@ fn inner_process_document(
                         match_foreach_if(handle, foreach_value, &attr_info.value, unwrapped_children);
                     }
                     "foreach" => {
-                        let val_split = attr_info.value.split(".");
-                        let mut disp_val = modal;
-                        for val in val_split {
-                            disp_val = &disp_val[val];
-                        }
-                        
-                        // remove original node since it contains no relavent data
-                        if let Some(pos) = unwrapped_children.iter().position(|child| Rc::ptr_eq(child, handle)) {
-                            unwrapped_children.remove(pos);
-                        }
-
-                        let mut new_children = vec![];
-                        for val in disp_val.as_array().unwrap() {
-                            for child in unwrapped_children.clone().iter() {
-                                let mut bytes = vec![];
-                                let document_clone: SerializableHandle = child.clone().into();
-                                serialize(&mut bytes, &document_clone, SerializeOpts::default()).unwrap();
-                                let result = String::from_utf8(bytes).unwrap();
-                                
-                                let handle_clone = parse_fragment(
-                                    RcDom::default(), 
-                                    opts.clone(), 
-                                    QualName::new(None, ns!(html), local_name!("body")), 
-                                    vec![],
-                                true)
-                                .one(result);
-
-                                {
-                                    let mut borrowed_children = handle_clone.document.children.borrow_mut();
-                                    inner_process_document(dom, indent + 4, child, Some(&mut borrowed_children), modal, val, opts);
-                                }
-
-                                new_children.push(handle_clone.document);
-                            }
-                        }
-
-                        for child in new_children {
-                            for actual_child in child.children.borrow().clone() {
-                                unwrapped_children.push(actual_child);
-                            }
-                        }
+                        match_foreach(dom, handle, modal, opts, attr_info, unwrapped_children);
                         return;
                     }
                     _ => {}
@@ -176,7 +150,7 @@ fn inner_process_document(
     
     let mut children = handle.children.borrow_mut();
     for child in children.clone().iter() {
-        inner_process_document(dom, indent + 4, child, Some(&mut children), modal, foreach_value, opts);
+        inner_process_document(dom, child, Some(&mut children), modal, foreach_value, opts);
     }
 }
 
@@ -273,4 +247,53 @@ fn match_foreach_if(handle: &Rc<Node>, foreach_value: &Value, attr_val: &String,
             unwrapped_children.remove(pos);
         }
     }
+}
+
+fn match_foreach(dom: &RcDom, handle: &Rc<Node>, modal: &Value, opts: &ParseOpts, attr_info: AttrInfo, unwrapped_children: &mut RefMut<'_, Vec<Rc<Node>>>) {
+    let val_split = attr_info.value.split(".");
+    let mut disp_val = modal;
+    for val in val_split {
+        disp_val = &disp_val[val];
+    }
+                        
+    // remove original node since it contains no relavent data
+    if let Some(pos) = unwrapped_children.iter().position(|child| Rc::ptr_eq(child, handle)) {
+        unwrapped_children.remove(pos);
+    }
+
+    let mut new_children = vec![];
+    for val in disp_val.as_array().unwrap() {
+        for child in unwrapped_children.clone().iter() {
+            let handle_clone = clone_handle(opts, child);
+
+            {
+                let mut borrowed_children = handle_clone.document.children.borrow_mut();
+                inner_process_document(dom, child, Some(&mut borrowed_children), modal, val, opts);
+            }
+
+            new_children.push(handle_clone.document);
+        }
+    }
+
+    for child in new_children {
+        for actual_child in child.children.borrow().clone() {
+            unwrapped_children.push(actual_child);
+        }
+    }
+}
+
+fn clone_handle(opts: &ParseOpts, child: &Rc<Node>) -> RcDom {
+    let mut bytes = vec![];
+    let document_clone: SerializableHandle = child.clone().into();
+    serialize(&mut bytes, &document_clone, SerializeOpts::default()).unwrap();
+    let result = String::from_utf8(bytes).unwrap();
+                                
+    let handle_clone = parse_fragment(
+        RcDom::default(), 
+        opts.clone(), 
+        QualName::new(None, ns!(html), local_name!("body")), 
+        vec![],
+    true)
+    .one(result);
+    handle_clone
 }
