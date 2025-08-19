@@ -6,6 +6,7 @@ use actix_web::{self, main, web, App, HttpResponse, HttpServer};
 mod routes;
 mod controllers;
 mod helpers;
+mod html_modal;
 
 #[main]
 async fn main() -> std::io::Result<()> {
