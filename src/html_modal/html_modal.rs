@@ -1,5 +1,5 @@
 use std::{
-    cell::{ RefCell, RefMut }, rc::Rc
+    cell::{RefCell, RefMut}, rc::Rc
 };
 use serde_json::Value;
 use html5ever::{
@@ -72,33 +72,33 @@ pub fn process_document<T>(
     where
         T: serde::ser::Serialize
     {
-        let json_value: Value = serde_json::to_value(&modal).unwrap();
-        let document = &dom.document;
+    let json_value: Value = serde_json::to_value(&modal).unwrap();
+    let document = &dom.document;
 
-        match opts {
-            None => {
-                let default_opts = ParseOpts {
-                        tree_builder: TreeBuilderOpts {
-                            drop_doctype: true,
-                            ..Default::default()
-                        },
-                    ..Default::default()
-                };
+    match opts {
+        None => {
+            let default_opts = ParseOpts {
+                    tree_builder: TreeBuilderOpts {
+                        drop_doctype: true,
+                        ..Default::default()
+                    },
+                ..Default::default()
+            };
 
-                inner_process_document(&dom, document, None, &json_value, &Value::Null, &default_opts);
-            }
-            Some(value) => {
-                inner_process_document(&dom, document, None, &json_value, &Value::Null, &value);
-            }
+            inner_process_document(&dom, document, None, &json_value, &Value::Null, &default_opts);
         }
-        
-        let mut bytes = vec![];
-        let document_clone: SerializableHandle = dom.document.clone().into();
-        serialize(&mut bytes, &document_clone, SerializeOpts::default()).unwrap();
-        let result = String::from_utf8(bytes).unwrap();
-
-        result
+        Some(value) => {
+            inner_process_document(&dom, document, None, &json_value, &Value::Null, &value);
+        }
     }
+    
+    let mut bytes = vec![];
+    let document_clone: SerializableHandle = dom.document.clone().into();
+    serialize(&mut bytes, &document_clone, SerializeOpts::default()).unwrap();
+    let result = String::from_utf8(bytes).unwrap();
+
+    result
+}
 
 fn inner_process_document(
     dom: &RcDom,
@@ -119,22 +119,21 @@ fn inner_process_document(
 
                 let attr_info = get_attr_info(attrs);
 
-                let unwrapped_children = parent_children.unwrap();
-
                 match attr_info.name.to_lowercase().as_str() {
                     "value" => {
-                        match_value(handle, modal, &attr_info.value, unwrapped_children);
+                        match_value(handle, modal, &attr_info.value);
                     }
                     "foreach-value" => {
-                        match_foreach_value(handle, foreach_value, &attr_info.value, unwrapped_children);
+                        match_foreach_value(handle, foreach_value, &attr_info.value);
                     }
                     "if" => {
-                        match_if(handle, modal, &attr_info.value, unwrapped_children);
+                        match_if(handle, modal, &attr_info.value);
                     }
                     "foreach-if" => {
-                        match_foreach_if(handle, foreach_value, &attr_info.value, unwrapped_children);
+                        match_foreach_if(handle, foreach_value, &attr_info.value);
                     }
                     "foreach" => {
+                        let unwrapped_children = parent_children.unwrap();
                         match_foreach(dom, handle, modal, opts, attr_info, unwrapped_children);
                         return;
                     }
@@ -149,6 +148,7 @@ fn inner_process_document(
     }
     
     let mut children = handle.children.borrow_mut();
+
     for child in children.clone().iter() {
         inner_process_document(dom, child, Some(&mut children), modal, foreach_value, opts);
     }
@@ -173,28 +173,30 @@ fn get_attr_info(attrs: &RefCell<Vec<html5ever::Attribute>>) -> AttrInfo {
     attr_info
 }
 
-fn match_value(handle: &Rc<Node>, modal: &Value, attr_val: &String, unwrapped_children: &mut RefMut<'_, Vec<Rc<Node>>>) {
+fn match_value(handle: &Rc<Node>, modal: &Value, attr_val: &String) {
     let val_split = attr_val.split(".");
     let mut disp_val = modal;
 
     for val in val_split {
+        if disp_val.is_string() {
+            break;
+        }
+
         disp_val = &disp_val[val];
     }
 
-    if let Some(pos) = unwrapped_children.iter().position(|child| Rc::ptr_eq(child, handle)) {
-        let mut text = StrTendril::new();
-        let text_handle = text.try_push_bytes(disp_val.as_str().unwrap().as_bytes());
+    let mut text = StrTendril::new();
+    let text_handle = text.try_push_bytes(disp_val.as_str().unwrap().as_bytes());
 
-        match text_handle {
-            Ok(_) => {
-                unwrapped_children.insert(pos, Node::new(NodeData::Text { contents: RefCell::new(text) }));
-            }
-            Err(_) => {}
+    match text_handle {
+        Ok(_) => {
+            handle.children.borrow_mut().insert(0, Node::new(NodeData::Text { contents: RefCell::new(text) }));
         }
+        Err(_) => {}
     }
 }
 
-fn match_foreach_value(handle: &Rc<Node>, foreach_value: &Value, attr_val: &String, unwrapped_children: &mut RefMut<'_, Vec<Rc<Node>>>) {
+fn match_foreach_value(handle: &Rc<Node>, foreach_value: &Value, attr_val: &String) {
     let val_split = attr_val.split(".");
     let mut disp_val = foreach_value;
 
@@ -206,20 +208,18 @@ fn match_foreach_value(handle: &Rc<Node>, foreach_value: &Value, attr_val: &Stri
         disp_val = &disp_val[val];
     }
 
-    if let Some(pos) = unwrapped_children.iter().position(|child| Rc::ptr_eq(child, handle)) {
-        let mut text = StrTendril::new();
-        let text_handle = text.try_push_bytes(disp_val.as_str().unwrap().as_bytes());
+    let mut text = StrTendril::new();
+    let text_handle = text.try_push_bytes(disp_val.as_str().unwrap().as_bytes());
 
-        match text_handle {
-            Ok(_) => {
-                unwrapped_children.insert(pos, Node::new(NodeData::Text { contents: RefCell::new(text) }));
-            }
-            Err(_) => {}
+    match text_handle {
+        Ok(_) => {
+            handle.children.borrow_mut().insert(0, Node::new(NodeData::Text { contents: RefCell::new(text) }));
         }
+        Err(_) => {}
     }
 }
 
-fn match_if(handle: &Rc<Node>, modal: &Value, attr_val: &String, unwrapped_children: &mut RefMut<'_, Vec<Rc<Node>>>) {
+fn match_if(handle: &Rc<Node>, modal: &Value, attr_val: &String) {
     let val_split = attr_val.split(".");
     let mut disp_val = modal;
                         
@@ -228,13 +228,15 @@ fn match_if(handle: &Rc<Node>, modal: &Value, attr_val: &String, unwrapped_child
     }
                         
     if !disp_val.as_bool().unwrap() {
-        if let Some(pos) = unwrapped_children.iter().position(|child| Rc::ptr_eq(child, handle)) {
-            unwrapped_children.remove(pos);
+        let mut children = handle.children.borrow_mut();
+
+        for _ in 0..children.len() {
+            children.remove(0);
         }
     }
 }
 
-fn match_foreach_if(handle: &Rc<Node>, foreach_value: &Value, attr_val: &String, unwrapped_children: &mut RefMut<'_, Vec<Rc<Node>>>) {
+fn match_foreach_if(handle: &Rc<Node>, foreach_value: &Value, attr_val: &String) {
     let val_split = attr_val.split(".");
     let mut disp_val = foreach_value;
 
@@ -243,57 +245,62 @@ fn match_foreach_if(handle: &Rc<Node>, foreach_value: &Value, attr_val: &String,
     }
 
     if !disp_val.as_bool().unwrap() {
-        if let Some(pos) = unwrapped_children.iter().position(|child| Rc::ptr_eq(child, handle)) {
-            unwrapped_children.remove(pos);
+        let mut children = handle.children.borrow_mut();
+
+        for _ in 0..children.len() {
+            children.remove(0);
         }
     }
 }
 
-fn match_foreach(dom: &RcDom, handle: &Rc<Node>, modal: &Value, opts: &ParseOpts, attr_info: AttrInfo, unwrapped_children: &mut RefMut<'_, Vec<Rc<Node>>>) {
+fn match_foreach(dom: &RcDom, handle: &Rc<Node>, modal: &Value, opts: &ParseOpts, attr_info: AttrInfo, parent_children: &mut RefMut<'_, Vec<Rc<Node>>>) {
     let val_split = attr_info.value.split(".");
     let mut disp_val = modal;
     for val in val_split {
         disp_val = &disp_val[val];
     }
-                        
+                 
+    let base_handle_clone = clone_handle(opts, handle);
+    let clone_children = base_handle_clone.document.children.borrow_mut();
+ 
     // remove original node since it contains no relavent data
-    if let Some(pos) = unwrapped_children.iter().position(|child| Rc::ptr_eq(child, handle)) {
-        unwrapped_children.remove(pos);
+    if let Some(pos) = parent_children.iter().position(|child| Rc::ptr_eq(child, handle)) {
+        parent_children.remove(pos);
     }
 
-    let mut new_children = vec![];
     for val in disp_val.as_array().unwrap() {
-        for child in unwrapped_children.clone().iter() {
-            let handle_clone = clone_handle(opts, child);
+        println!("Array value: {}", val.as_str().unwrap());
+
+        for child in clone_children.clone().iter() {
+            let child_clone = clone_handle(opts, child);
 
             {
-                let mut borrowed_children = handle_clone.document.children.borrow_mut();
-                inner_process_document(dom, child, Some(&mut borrowed_children), modal, val, opts);
+                inner_process_document(dom, &child_clone.document, Some(parent_children), modal, val, opts);
             }
 
-            new_children.push(handle_clone.document);
-        }
-    }
-
-    for child in new_children {
-        for actual_child in child.children.borrow().clone() {
-            unwrapped_children.push(actual_child);
+            for actual_child in child_clone.document.children.take() {
+                println!("actual_child node: {}", node_to_string(&actual_child));
+                parent_children.push(actual_child);
+            }
         }
     }
 }
 
 fn clone_handle(opts: &ParseOpts, child: &Rc<Node>) -> RcDom {
-    let mut bytes = vec![];
-    let document_clone: SerializableHandle = child.clone().into();
-    serialize(&mut bytes, &document_clone, SerializeOpts::default()).unwrap();
-    let result = String::from_utf8(bytes).unwrap();
-                                
-    let handle_clone = parse_fragment(
+    let result = node_to_string(child);
+
+    parse_fragment(
         RcDom::default(), 
         opts.clone(), 
         QualName::new(None, ns!(html), local_name!("body")), 
         vec![],
     true)
-    .one(result);
-    handle_clone
+    .one(result)
+}
+
+fn node_to_string(child: &Rc<Node>) -> String {
+    let mut bytes = vec![];
+    let document_clone: SerializableHandle = child.clone().into();
+    serialize(&mut bytes, &document_clone, SerializeOpts::default()).unwrap();
+    String::from_utf8(bytes).unwrap()
 }

@@ -2,13 +2,10 @@ use actix_web::{
     self, HttpRequest, HttpResponse, Responder
 };
 use super::super::helpers::http_helpers;
-use serde::{
-    Deserialize, 
-    Serialize
-};
+use serde::Serialize;
 use super::super::html_modal::html_modal;
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize)]
 struct User {
     name: String,
     email: String,
@@ -27,7 +24,7 @@ pub async fn hello() -> impl Responder {
         <title>Hello, world!</title>
         <h1 class="foo">Hello, <i>world!</i></h1>
         <h2>
-            <html-modal type="value" value="name" />
+            <html-modal type="value" value="name"></html-modal>
             <html-modal type="if" value="test_true"></br>
                 test_true is displaying properly.
             </html-modal>
@@ -36,7 +33,7 @@ pub async fn hello() -> impl Responder {
             </html-modal>
             <ul>
             <html-modal type="foreach" value="test_data">
-                <li><html-modal type="foreach-value" value="" /></li>
+                <li><html-modal type="foreach-value" value=""></html-modal></li>
             </html-modal>
             </ul>
             <br/>Bottom text.
