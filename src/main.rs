@@ -3,7 +3,7 @@ extern crate html5ever;
 extern crate markup5ever_rcdom as rcdom;
 
 use actix_web::{self, main, web, App, HttpResponse, HttpServer};
-mod routes;
+mod config;
 mod controllers;
 mod helpers;
 mod html_modal;
@@ -12,7 +12,7 @@ mod html_modal;
 async fn main() -> std::io::Result<()> {
     HttpServer::new(|| {
         App::new()
-        .configure(routes::auth::add_routes)
+        .configure(config::auth::add_routes)
         .route("/", web::get().to(route_default))
         .default_service(web::route().to(default_svc))
     })

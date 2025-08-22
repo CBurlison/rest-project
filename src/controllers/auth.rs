@@ -8,6 +8,7 @@ use super::super::html_modal::html_modal;
 #[derive(Serialize)]
 struct User {
     name: String,
+    number: i32,
     email: String,
     password: String,
     ip: String,
@@ -25,6 +26,7 @@ pub async fn hello() -> impl Responder {
         <h1 class="foo">Hello, <i>world!</i></h1>
         <h2>
             <html-modal type="value" value="name"></html-modal>
+            <html-modal type="value" value="number"></html-modal>
             <html-modal type="if" value="test_true"></br>
                 test_true is displaying properly.
             </html-modal>
@@ -42,6 +44,7 @@ pub async fn hello() -> impl Responder {
 
     let user = User {
         name: "Cory".to_string(),
+        number: 10,
         password: "dummy".to_string(),
         email: "test@gmail.com".to_string(),
         ip: "127.0.0.1".to_string(),

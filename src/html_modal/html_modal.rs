@@ -124,13 +124,13 @@ fn inner_process_document(
                         match_value(handle, modal, &attr_info.value);
                     }
                     "foreach-value" => {
-                        match_foreach_value(handle, foreach_value, &attr_info.value);
+                        match_value(handle, foreach_value, &attr_info.value);
                     }
                     "if" => {
                         match_if(handle, modal, &attr_info.value);
                     }
                     "foreach-if" => {
-                        match_foreach_if(handle, foreach_value, &attr_info.value);
+                        match_if(handle, foreach_value, &attr_info.value);
                     }
                     "foreach" => {
                         let unwrapped_children = parent_children.unwrap();
@@ -174,43 +174,35 @@ fn get_attr_info(attrs: &RefCell<Vec<html5ever::Attribute>>) -> AttrInfo {
 }
 
 fn match_value(handle: &Rc<Node>, modal: &Value, attr_val: &String) {
-    let val_split = attr_val.split(".");
-    let mut disp_val = modal;
-
-    for val in val_split {
-        if disp_val.is_string() {
-            break;
-        }
-
-        disp_val = &disp_val[val];
-    }
-
+    let disp_val = get_display_value(modal, attr_val);
+    
     let mut text = StrTendril::new();
-    let text_handle = text.try_push_bytes(disp_val.as_str().unwrap().as_bytes());
+    let mut text_str = "".to_string();
 
-    match text_handle {
-        Ok(_) => {
-            handle.children.borrow_mut().insert(0, Node::new(NodeData::Text { contents: RefCell::new(text) }));
-        }
-        Err(_) => {}
+    if disp_val.is_string() {
+        text_str = disp_val.as_str().unwrap().to_string();
     }
-}
-
-fn match_foreach_value(handle: &Rc<Node>, foreach_value: &Value, attr_val: &String) {
-    let val_split = attr_val.split(".");
-    let mut disp_val = foreach_value;
-
-    for val in val_split {
-        if disp_val.is_string() {
-            break;
-        }
-        
-        disp_val = &disp_val[val];
+    else if disp_val.is_boolean() {
+        text_str = disp_val.as_bool().unwrap().to_string();
+    }
+    else if disp_val.is_f64() {
+        text_str = disp_val.as_f64().unwrap().to_string();
+    }
+    else if disp_val.is_i64() {
+        text_str = disp_val.as_i64().unwrap().to_string();
+    }
+    else if disp_val.is_u64() {
+        text_str = disp_val.as_u64().unwrap().to_string();
+    }
+    else if disp_val.is_number() {
+        text_str = disp_val.as_number().unwrap().to_string();
     }
 
-    let mut text = StrTendril::new();
-    let text_handle = text.try_push_bytes(disp_val.as_str().unwrap().as_bytes());
-
+    if text_str == "" {
+        return;
+    }
+    
+    let text_handle = text.try_push_bytes(text_str.as_bytes());
     match text_handle {
         Ok(_) => {
             handle.children.borrow_mut().insert(0, Node::new(NodeData::Text { contents: RefCell::new(text) }));
@@ -220,30 +212,8 @@ fn match_foreach_value(handle: &Rc<Node>, foreach_value: &Value, attr_val: &Stri
 }
 
 fn match_if(handle: &Rc<Node>, modal: &Value, attr_val: &String) {
-    let val_split = attr_val.split(".");
-    let mut disp_val = modal;
+    let disp_val = get_display_value(modal, attr_val);
                         
-    for val in val_split {
-        disp_val = &disp_val[val];
-    }
-                        
-    if !disp_val.as_bool().unwrap() {
-        let mut children = handle.children.borrow_mut();
-
-        for _ in 0..children.len() {
-            children.remove(0);
-        }
-    }
-}
-
-fn match_foreach_if(handle: &Rc<Node>, foreach_value: &Value, attr_val: &String) {
-    let val_split = attr_val.split(".");
-    let mut disp_val = foreach_value;
-
-    for val in val_split {
-        disp_val = &disp_val[val];
-    }
-
     if !disp_val.as_bool().unwrap() {
         let mut children = handle.children.borrow_mut();
 
@@ -254,11 +224,7 @@ fn match_foreach_if(handle: &Rc<Node>, foreach_value: &Value, attr_val: &String)
 }
 
 fn match_foreach(dom: &RcDom, handle: &Rc<Node>, modal: &Value, opts: &ParseOpts, attr_info: AttrInfo, parent_children: &mut RefMut<'_, Vec<Rc<Node>>>) {
-    let val_split = attr_info.value.split(".");
-    let mut disp_val = modal;
-    for val in val_split {
-        disp_val = &disp_val[val];
-    }
+    let disp_val = get_display_value(modal, &attr_info.value);
                  
     let base_handle_clone = clone_handle(opts, handle);
     let clone_children = base_handle_clone.document.children.borrow_mut();
@@ -269,8 +235,6 @@ fn match_foreach(dom: &RcDom, handle: &Rc<Node>, modal: &Value, opts: &ParseOpts
     }
 
     for val in disp_val.as_array().unwrap() {
-        println!("Array value: {}", val.as_str().unwrap());
-
         for child in clone_children.clone().iter() {
             let child_clone = clone_handle(opts, child);
 
@@ -279,11 +243,25 @@ fn match_foreach(dom: &RcDom, handle: &Rc<Node>, modal: &Value, opts: &ParseOpts
             }
 
             for actual_child in child_clone.document.children.take() {
-                println!("actual_child node: {}", node_to_string(&actual_child));
                 parent_children.push(actual_child);
             }
         }
     }
+}
+
+fn get_display_value(modal: &Value, attr_val: &String) -> Value {
+    let val_split = attr_val.split(".");
+    let mut disp_val = modal;
+
+    for val in val_split {
+        if disp_val.is_object() {
+            disp_val = &disp_val[val];
+        }
+        else {
+            break;
+        }
+    }
+    disp_val.clone()
 }
 
 fn clone_handle(opts: &ParseOpts, child: &Rc<Node>) -> RcDom {
