@@ -3,7 +3,7 @@ use actix_web::{
 };
 use super::super::helpers::http_helpers;
 use serde::Serialize;
-use super::super::html_modal::html_modal;
+use super::super::html_modal::html_modal::{ HtmlModalParser, ModalParser };
 
 #[derive(Serialize)]
 struct User {
@@ -19,7 +19,7 @@ struct User {
 }
 
 pub async fn hello() -> impl Responder {
-    let html = r#"
+    let html = String::from(r#"
         <!DOCTYPE html>
         <meta charset="utf-8">
         <title>Hello, world!</title>
@@ -40,21 +40,22 @@ pub async fn hello() -> impl Responder {
             </ul>
             <br/>Bottom text.
         </h2>
-    "#.to_string();
+    "#);
 
     let user = User {
-        name: "Cory".to_string(),
+        name: String::from("Cory"),
         number: 10,
-        password: "dummy".to_string(),
-        email: "test@gmail.com".to_string(),
-        ip: "127.0.0.1".to_string(),
-        session: "this is the session ID".to_string(),
-        test_data: vec!["test_val_1".to_string(), "test_val_2".to_string(), "test_val_3".to_string()],
+        password: String::from("dummy"),
+        email: String::from("test@gmail.com"),
+        ip: String::from("127.0.0.1"),
+        session: String::from("this is the session ID"),
+        test_data: vec![String::from("test_val_1"), String::from("test_val_2"), String::from("test_val_3")],
         test_true: true,
         test_false: false
     };
     
-    let result = html_modal::process_string(&html, &user, None);
+    let parser = HtmlModalParser { opts: Default::default() };
+    let result = parser.process_string(&html, &user);
     
     HttpResponse::Ok().body(result)
 }

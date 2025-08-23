@@ -10,6 +10,8 @@ mod html_modal;
 
 #[main]
 async fn main() -> std::io::Result<()> {
+    // config::db::config_db();
+
     HttpServer::new(|| {
         App::new()
         .configure(config::auth::add_routes)

@@ -30,14 +30,85 @@ struct AttrInfo {
     value: String
 }
 
-pub fn process_string<T>(
-    html: &String,
-    modal: &T,
-    opts: Option<ParseOpts>) -> String
-    where
-        T: serde::ser::Serialize
-    {
-        match opts {
+pub struct HtmlModalParser {
+    pub opts: Option<ParseOpts>
+}
+
+impl Default for HtmlModalParser {
+    fn default() -> Self {
+        HtmlModalParser { opts: Some(ParseOpts {
+                tree_builder: TreeBuilderOpts {
+                    drop_doctype: true,
+                    ..Default::default()
+                },
+            ..Default::default()
+        })}
+    }
+}
+
+pub trait ModalParser {
+    fn process_string<T>(
+        &self,
+        html: &String,
+        modal: &T) -> String
+        where
+            T: serde::ser::Serialize;
+    
+    fn process_document<T>(
+        &self,
+        dom: &mut RcDom,
+        modal: &T) -> String 
+        where
+            T: serde::ser::Serialize;
+}
+
+impl ModalParser for HtmlModalParser {
+    fn process_string<T>(
+        &self,
+        html: &String,
+        modal: &T) -> String
+        where
+            T: serde::ser::Serialize
+        {
+            match &self.opts {
+                None => {
+                    let default_opts = ParseOpts {
+                            tree_builder: TreeBuilderOpts {
+                                drop_doctype: true,
+                                ..Default::default()
+                            },
+                        ..Default::default()
+                    };
+
+                    let mut dom = parse_document(RcDom::default(), default_opts.clone())
+                        .from_utf8()
+                        .read_from(&mut html.as_bytes())
+                        .unwrap();
+                    
+                    self.process_document(&mut dom, modal)
+                }
+                Some(value) => {
+                    let mut dom = parse_document(RcDom::default(), value.clone())
+                        .from_utf8()
+                        .read_from(&mut html.as_bytes())
+                        .unwrap();
+                    
+                    self.process_document(&mut dom, modal)
+                }
+            }
+        }
+
+    fn process_document<T>(
+        &self,
+        dom: &mut RcDom,
+        modal: &T) -> String 
+        where
+            T: serde::ser::Serialize
+        {
+        let json_value: Value = serde_json::to_value(&modal).unwrap();
+        let document = &dom.document;
+
+        match &self.opts {
             None => {
                 let default_opts = ParseOpts {
                         tree_builder: TreeBuilderOpts {
@@ -47,57 +118,29 @@ pub fn process_string<T>(
                     ..Default::default()
                 };
 
-                let mut dom = parse_document(RcDom::default(), default_opts.clone())
-                    .from_utf8()
-                    .read_from(&mut html.as_bytes())
-                    .unwrap();
-                
-                process_document(&mut dom, modal, Some(default_opts))
+                inner_process_document(&dom, document, None, &json_value, &Value::Null, &default_opts);
             }
             Some(value) => {
-                let mut dom = parse_document(RcDom::default(), value.clone())
-                    .from_utf8()
-                    .read_from(&mut html.as_bytes())
-                    .unwrap();
-                
-                process_document(&mut dom, modal, Some(value))
+                inner_process_document(&dom, document, None, &json_value, &Value::Null, &value);
             }
         }
-    }
+        
+        let mut bytes = vec![];
+        let document_clone: SerializableHandle = dom.document.clone().into();
+        let serialize = serialize(&mut bytes, &document_clone, SerializeOpts::default());
 
-pub fn process_document<T>(
-    dom: &mut RcDom,
-    modal: &T,
-    opts: Option<ParseOpts>) -> String 
-    where
-        T: serde::ser::Serialize
-    {
-    let json_value: Value = serde_json::to_value(&modal).unwrap();
-    let document = &dom.document;
-
-    match opts {
-        None => {
-            let default_opts = ParseOpts {
-                    tree_builder: TreeBuilderOpts {
-                        drop_doctype: true,
-                        ..Default::default()
-                    },
-                ..Default::default()
-            };
-
-            inner_process_document(&dom, document, None, &json_value, &Value::Null, &default_opts);
+        match serialize {
+            Ok(_) => {}
+            Err(_) => { return String::from(""); }
         }
-        Some(value) => {
-            inner_process_document(&dom, document, None, &json_value, &Value::Null, &value);
+
+        let result = String::from_utf8(bytes);
+
+        match result {
+            Ok(res) => { res }
+            Err(_) => { String::from("") }
         }
     }
-    
-    let mut bytes = vec![];
-    let document_clone: SerializableHandle = dom.document.clone().into();
-    serialize(&mut bytes, &document_clone, SerializeOpts::default()).unwrap();
-    let result = String::from_utf8(bytes).unwrap();
-
-    result
 }
 
 fn inner_process_document(
@@ -155,7 +198,7 @@ fn inner_process_document(
 }
 
 fn get_attr_info(attrs: &RefCell<Vec<html5ever::Attribute>>) -> AttrInfo {
-    let mut attr_info: AttrInfo = AttrInfo { name: "".to_string(), value: "".to_string() };
+    let mut attr_info: AttrInfo = AttrInfo { name: String::from(""), value: String::from("") };
 
     for attr in attrs.borrow().iter() {
         assert!(attr.name.ns == ns!());
@@ -177,10 +220,10 @@ fn match_value(handle: &Rc<Node>, modal: &Value, attr_val: &String) {
     let disp_val = get_display_value(modal, attr_val);
     
     let mut text = StrTendril::new();
-    let mut text_str = "".to_string();
+    let mut text_str = String::from("");
 
     if disp_val.is_string() {
-        text_str = disp_val.as_str().unwrap().to_string();
+        text_str = String::from(disp_val.as_str().unwrap());
     }
     else if disp_val.is_boolean() {
         text_str = disp_val.as_bool().unwrap().to_string();
