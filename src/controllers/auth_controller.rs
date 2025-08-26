@@ -14,8 +14,10 @@ struct User {
     password: String,
     ip: String,
     session: String,
-    test_bool: bool,
-    test_bool2: bool
+    test_true: bool,
+    test_false: bool,
+    str_vec: Vec<String>,
+    user_vec: Vec<User>
 }
 
 pub async fn hello() -> impl Responder {
@@ -24,14 +26,42 @@ pub async fn hello() -> impl Responder {
         <meta charset="utf-8">
         <title>Hello, world!</title>
         <h2>
-            @value:name;
-            @if:test_bool;{
-            <br/>this is displaying!
+            /@value:name; Example <br/>@value:name;
+            <br/><br/>
+            /@value:str_vec[2]; Example <br/>@value:str_vec[2];
+            <br/><br/>
+            /@if:test_true; Example
+            <br/>
+            @if:test_true;{
+            this is displaying!
             }
-            @if:test_bool2;{
-            <br/>this should not be here!
+            <br/><br/>
+            /@if:test_false; Example
+            <br/>
+            @if:test_false;{
+            <br/>
+            this should not be here!
             }
-            <br/>/@value:name;
+            <br/><br/>
+            /@foreach:str_vec; Example
+            <ul>
+            @foreach:str_vec;{
+                <li>/@foreachvalue:0; = @foreachvalue:0;</li>
+            }
+            </ul>
+            <br/><br/>
+            /@foreach:user_vec; Example
+            <ul>
+            @foreach:user_vec;{
+                <li>/@foreachvalue:0.name; = @foreachvalue:0.name;</li>
+            
+                <br/>/@foreachforeach:0.user_vec; Example
+                @foreachforeach:0.user_vec;{
+                    <li>/@foreachvalue:1.name; = @foreachvalue:1.name;</li>
+                }
+                <br/>
+            }
+            </ul>
         </h2>
     "#);
 
@@ -42,8 +72,44 @@ pub async fn hello() -> impl Responder {
         password: String::from(""),
         ip: String::from(""),
         session: String::from(""),
-        test_bool: true,
-        test_bool2: false
+        test_true: true,
+        test_false: false,
+        str_vec: vec![String::from("str 1"), String::from("str 2"), String::from("str 3")],
+        user_vec: vec![User {
+                id: Uuid::new_v4().to_string(),
+                name: String::from("Test Name 2"),
+                email: String::from(""),
+                password: String::from(""),
+                ip: String::from(""),
+                session: String::from(""),
+                test_true: true,
+                test_false: false,
+                str_vec: vec![String::from("str 4"), String::from("str 5"), String::from("str 6")],
+                user_vec: vec![User {
+                    id: Uuid::new_v4().to_string(),
+                    name: String::from("Test Name 4"),
+                    email: String::from(""),
+                    password: String::from(""),
+                    ip: String::from(""),
+                    session: String::from(""),
+                    test_true: true,
+                    test_false: false,
+                    str_vec: vec![String::from("str 4"), String::from("str 5"), String::from("str 6")],
+                    user_vec: vec![]
+                }]
+            },
+            User {
+                id: Uuid::new_v4().to_string(),
+                name: String::from("Test Name 3"),
+                email: String::from(""),
+                password: String::from(""),
+                ip: String::from(""),
+                session: String::from(""),
+                test_true: true,
+                test_false: false,
+                str_vec: vec![String::from("str 1"), String::from("str 1"), String::from("str 1")],
+                user_vec: vec![]
+            }]
     };
 
     let parser: HtmlModalParser = HtmlModalParser{};

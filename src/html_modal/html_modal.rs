@@ -74,10 +74,10 @@ fn parse_tokens(str: &String, modal: &Value, foreach_modal: &mut Vec<Option<Valu
                 "foreachvalue" => {
                     let mut parts = token_key.splitn(2, '.');
 
-                    if let (Some(idx_str), Some(key)) = (parts.next(), parts.next()) {
+                    if let (Some(idx_str), key) = (parts.next(), parts.next()) {
                         if let Ok(idx) = idx_str.parse::<usize>() {
                             if let Some(Some(fe_mod)) = foreach_modal.get(idx) {
-                                let val = get_display_string(fe_mod, &key.to_string());
+                                let val = get_display_string(fe_mod, &key.unwrap_or_default().to_string());
                                 ret_vec.extend_from_slice(val.as_bytes());
                             }
                         }
@@ -229,7 +229,7 @@ fn get_display_value(modal: &Value, attr_val: &String) -> Value {
                     disp_val = &disp_val[key];
 
                     if disp_val.is_array() {
-                        let index = idx_str.parse::<usize>();
+                        let index = idx_str[0..idx_str.len()-1].parse::<usize>();
 
                         match index {
                             Ok(idx) => {
