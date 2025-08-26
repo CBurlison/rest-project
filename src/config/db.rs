@@ -1,11 +1,27 @@
-// use diesel::{sqlite::SqliteConnection, Connection};
-// use dotenvy::dotenv;
-// use std::env;
+// use rusqlite::{ params, Connection, Result };
 
-// pub fn config_db() {
-//     dotenv().ok();
+pub fn config_db() {
+    // let conn = Connection::open("data/database.db");
 
-//     let database_url = env::var("DATABASE_URL").expect("DATABASE_URL must be set");
-//     let db = SqliteConnection::establish(database_url.as_str())
-//         .unwrap_or_else(|_| panic!("Error connecting to {}", database_url));
-// }
+    // match conn {
+    //     Ok(connection) => {
+    //         let query = connection.execute(
+    //     r#"
+    //         IF (EXISTS (SELECT * 
+    //              FROM INFORMATION_SCHEMA.TABLES 
+    //              WHERE TABLE_NAME = 'users'))
+    //         BEGIN
+    //             CREATE TABLE users (
+    //                 id INTEGER PRIMARY KEY,
+    //                 name TEXT NOT NULL,
+    //                 email TEXT NOT NULL,
+    //                 password TEXT NOT NULL,
+    //                 ip TEXT NOT NULL,
+    //                 session TEXT NOT NULL,
+    //             )
+    //         END
+    //         "#, ());
+    //     }
+    //     Err(_) => {}
+    // }
+}

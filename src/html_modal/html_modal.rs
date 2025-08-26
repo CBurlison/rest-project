@@ -1,295 +1,220 @@
-use std::{
-    cell::{RefCell, RefMut}, rc::Rc
-};
 use serde_json::Value;
-use html5ever::{
-    parse_document,
-    parse_fragment,
-    tendril::{
-        TendrilSink,
-        StrTendril
-    }, 
-    tree_builder::TreeBuilderOpts,
-    ParseOpts,
-    serialize::{
-        SerializeOpts, 
-        serialize,
-    },
-    QualName
-};
-use rcdom::{
-    Handle, 
-    NodeData, 
-    RcDom,
-    SerializableHandle,
-    Node
-};
 
-struct AttrInfo {
-    name: String,
-    value: String
-}
-
-pub struct HtmlModalParser {
-    pub opts: Option<ParseOpts>
-}
-
-impl Default for HtmlModalParser {
-    fn default() -> Self {
-        HtmlModalParser { opts: Some(ParseOpts {
-                tree_builder: TreeBuilderOpts {
-                    drop_doctype: true,
-                    ..Default::default()
-                },
-            ..Default::default()
-        })}
-    }
-}
+pub struct HtmlModalParser;
 
 pub trait ModalParser {
-    fn process_string<T>(
+    fn process_string<T: serde::ser::Serialize>(
         &self,
         html: &String,
-        modal: &T) -> String
-        where
-            T: serde::ser::Serialize;
-    
-    fn process_document<T>(
-        &self,
-        dom: &mut RcDom,
-        modal: &T) -> String 
-        where
-            T: serde::ser::Serialize;
+        modal: &T) -> String;
 }
 
 impl ModalParser for HtmlModalParser {
-    fn process_string<T>(
+    fn process_string<T: serde::ser::Serialize>(
         &self,
         html: &String,
         modal: &T) -> String
-        where
-            T: serde::ser::Serialize
-        {
-            match &self.opts {
-                None => {
-                    let default_opts = ParseOpts {
-                            tree_builder: TreeBuilderOpts {
-                                drop_doctype: true,
-                                ..Default::default()
-                            },
-                        ..Default::default()
-                    };
-
-                    let mut dom = parse_document(RcDom::default(), default_opts.clone())
-                        .from_utf8()
-                        .read_from(&mut html.as_bytes())
-                        .unwrap();
-                    
-                    self.process_document(&mut dom, modal)
-                }
-                Some(value) => {
-                    let mut dom = parse_document(RcDom::default(), value.clone())
-                        .from_utf8()
-                        .read_from(&mut html.as_bytes())
-                        .unwrap();
-                    
-                    self.process_document(&mut dom, modal)
-                }
-            }
-        }
-
-    fn process_document<T>(
-        &self,
-        dom: &mut RcDom,
-        modal: &T) -> String 
-        where
-            T: serde::ser::Serialize
-        {
-        let json_value: Value = serde_json::to_value(&modal).unwrap();
-        let document = &dom.document;
-
-        match &self.opts {
-            None => {
-                let default_opts = ParseOpts {
-                        tree_builder: TreeBuilderOpts {
-                            drop_doctype: true,
-                            ..Default::default()
-                        },
-                    ..Default::default()
-                };
-
-                inner_process_document(&dom, document, None, &json_value, &Value::Null, &default_opts);
-            }
-            Some(value) => {
-                inner_process_document(&dom, document, None, &json_value, &Value::Null, &value);
-            }
-        }
-        
-        let mut bytes = vec![];
-        let document_clone: SerializableHandle = dom.document.clone().into();
-        let serialize = serialize(&mut bytes, &document_clone, SerializeOpts::default());
-
-        match serialize {
-            Ok(_) => {}
-            Err(_) => { return String::from(""); }
-        }
-
-        let result = String::from_utf8(bytes);
-
-        match result {
-            Ok(res) => { res }
-            Err(_) => { String::from("") }
-        }
-    }
-}
-
-fn inner_process_document(
-    dom: &RcDom,
-    handle: &Handle,
-    parent_children: Option<&mut RefMut<'_, Vec<Rc<Node>>>>,
-    modal: &Value, 
-    foreach_value: &Value,
-    opts: &ParseOpts)
     {
-    match handle.data {
-        NodeData::Element {
-            ref name,
-            ref attrs,
-            ..
-        } => {
-            if name.local.to_string().as_str() == "html-modal" {
-                assert!(name.ns == ns!(html));
+        let json_value: Value = serde_json::to_value(&modal).unwrap();
+        let mut foreach_vals: Vec<Option<Value>> = vec![];
 
-                let attr_info = get_attr_info(attrs);
+        parse_tokens(html, &json_value, &mut foreach_vals)
+    }
+}
 
-                match attr_info.name.to_lowercase().as_str() {
-                    "value" => {
-                        match_value(handle, modal, &attr_info.value);
+fn parse_tokens(str: &String, modal: &Value, foreach_modal: &mut Vec<Option<Value>>) -> String {
+    let mut escaped = false;
+    let mut ret_vec: Vec<u8> = vec![];
+    let bytes = str.as_bytes();
+    let mut i = 0;
+    let bytes_len = bytes.len();
+
+    while i < bytes_len {
+        let ch = bytes[i];
+        if ch == b'/' {
+            escaped = true;
+            ret_vec.push(ch);
+            i += 1;
+            continue;
+        }
+
+        if escaped {
+            escaped = false;
+            ret_vec.push(ch);
+            i += 1;
+            continue;
+        }
+
+        if ch == b'@' {
+            i += 1;
+            let mut token_type = String::new();
+            let mut token_key = String::new();
+
+            while i < bytes_len && bytes[i] != b':' {
+                token_type.push(bytes[i] as char);
+                i += 1;
+            }
+            if i < bytes_len && bytes[i] == b':' {
+                i += 1;
+            }
+
+            while i < bytes_len && bytes[i] != b';' && bytes[i] != b'{' {
+                token_key.push(bytes[i] as char);
+                i += 1;
+            }
+            if i < bytes_len && bytes[i] == b';' {
+                i += 1;
+            }
+
+            match token_type.to_lowercase().as_str() {
+                "value" => {
+                    let val = get_display_string(modal, &token_key);
+                    ret_vec.extend_from_slice(val.as_bytes());
+                }
+                "foreachvalue" => {
+                    let mut parts = token_key.splitn(2, '.');
+
+                    if let (Some(idx_str), Some(key)) = (parts.next(), parts.next()) {
+                        if let Ok(idx) = idx_str.parse::<usize>() {
+                            if let Some(Some(fe_mod)) = foreach_modal.get(idx) {
+                                let val = get_display_string(fe_mod, &key.to_string());
+                                ret_vec.extend_from_slice(val.as_bytes());
+                            }
+                        }
                     }
-                    "foreach-value" => {
-                        match_value(handle, foreach_value, &attr_info.value);
+                }
+                "foreach" => {
+                    while i < bytes_len && bytes[i] != b'{' { i += 1; }
+
+                    if i < bytes_len && bytes[i] == b'{' {
+                        i += 1;
+                        let mut brace_count = 1;
+                        let start = i;
+
+                        while i < bytes_len && brace_count > 0 {
+                            if bytes[i] == b'{' { brace_count += 1; }
+                            if bytes[i] == b'}' { brace_count -= 1; }
+                            i += 1;
+                        }
+
+                        let end = i - 1;
+                        let inner = String::from_utf8(bytes[start..end].to_vec()).unwrap_or_default();
+                        let disp_val = get_display_value(modal, &token_key);
+                        
+                        if let Some(arr) = disp_val.as_array() {
+                            for val in arr.iter() {
+                                foreach_modal.push(Some(val.clone()));
+                                let parsed = parse_tokens(&inner, modal, foreach_modal);
+                                ret_vec.extend_from_slice(parsed.as_bytes());
+                                foreach_modal.pop();
+                            }
+                        }
                     }
-                    "if" => {
-                        match_if(handle, modal, &attr_info.value);
+                }
+                "foreachforeach" => {
+                    let mut parts = token_key.splitn(2, '.');
+
+                    if let (Some(idx_str), Some(key)) = (parts.next(), parts.next()) {
+                        if let Ok(idx) = idx_str.parse::<usize>() {
+                            if let Some(Some(fe_mod)) = foreach_modal.get(idx) {
+
+                                while i < bytes_len && bytes[i] != b'{' { i += 1; }
+
+                                if i < bytes_len && bytes[i] == b'{' {
+                                    i += 1;
+                                    let mut brace_count = 1;
+                                    let start = i;
+
+                                    while i < bytes_len && brace_count > 0 {
+                                        if bytes[i] == b'{' { brace_count += 1; }
+                                        if bytes[i] == b'}' { brace_count -= 1; }
+                                        i += 1;
+                                    }
+
+                                    let end = i - 1;
+                                    let inner = String::from_utf8(bytes[start..end].to_vec()).unwrap_or_default();
+                                    let disp_val = get_display_value(fe_mod, &key.to_string());
+                                    
+                                    if let Some(arr) = disp_val.as_array() {
+                                        for val2 in arr.iter() {
+                                            foreach_modal.push(Some(val2.clone()));
+                                            let parsed = parse_tokens(&inner, modal, foreach_modal);
+                                            ret_vec.extend_from_slice(parsed.as_bytes());
+                                            foreach_modal.pop();
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     }
-                    "foreach-if" => {
-                        match_if(handle, foreach_value, &attr_info.value);
+                }
+                "if" => {
+                    while i < bytes_len && bytes[i] != b'{' { i += 1; }
+
+                    if i < bytes_len && bytes[i] == b'{' {
+                        i += 1;
+                        let mut brace_count = 1;
+                        let start = i;
+
+                        while i < bytes_len && brace_count > 0 {
+                            if bytes[i] == b'{' { brace_count += 1; }
+                            if bytes[i] == b'}' { brace_count -= 1; }
+                            i += 1;
+                        }
+
+                        let end = i - 1;
+                        let inner = String::from_utf8(bytes[start..end].to_vec()).unwrap_or_default();
+                        let disp_val = get_display_value(modal, &token_key);
+
+                        if disp_val.as_bool().unwrap_or(false) {
+                            let parsed = parse_tokens(&inner, modal, foreach_modal);
+                            ret_vec.extend_from_slice(parsed.as_bytes());
+                        }
                     }
-                    "foreach" => {
-                        let unwrapped_children = parent_children.unwrap();
-                        match_foreach(dom, handle, modal, opts, attr_info, unwrapped_children);
-                        return;
+                }
+                "foreachif" => {
+                    let mut parts = token_key.splitn(2, '.');
+                    if let (Some(idx_str), Some(key)) = (parts.next(), parts.next()) {
+                        if let Ok(idx) = idx_str.parse::<usize>() {
+                            if let Some(Some(fe_mod)) = foreach_modal.get(idx) {
+
+                                while i < bytes_len && bytes[i] != b'{' { i += 1; }
+
+                                if i < bytes_len && bytes[i] == b'{' {
+                                    i += 1;
+                                    let mut brace_count = 1;
+                                    let start = i;
+
+                                    while i < bytes_len && brace_count > 0 {
+                                        if bytes[i] == b'{' { brace_count += 1; }
+                                        if bytes[i] == b'}' { brace_count -= 1; }
+                                        i += 1;
+                                    }
+
+                                    let end = i - 1;
+                                    let inner = String::from_utf8(bytes[start..end].to_vec()).unwrap_or_default();
+                                    let disp_val = get_display_value(fe_mod, &key.to_string());
+
+                                    if disp_val.as_bool().unwrap_or(false) {
+                                        let parsed = parse_tokens(&inner, modal, foreach_modal);
+                                        ret_vec.extend_from_slice(parsed.as_bytes());
+                                    }
+                                }
+                            }
+                        }
                     }
-                    _ => {}
+                }
+                _ => {
+                    ret_vec.extend_from_slice(format!("@{}:{};", token_type, token_key).as_bytes());
                 }
             }
-        },
-
-        NodeData::ProcessingInstruction { .. } => unreachable!(),
-
-        _ => {}
-    }
-    
-    let mut children = handle.children.borrow_mut();
-
-    for child in children.clone().iter() {
-        inner_process_document(dom, child, Some(&mut children), modal, foreach_value, opts);
-    }
-}
-
-fn get_attr_info(attrs: &RefCell<Vec<html5ever::Attribute>>) -> AttrInfo {
-    let mut attr_info: AttrInfo = AttrInfo { name: String::from(""), value: String::from("") };
-
-    for attr in attrs.borrow().iter() {
-        assert!(attr.name.ns == ns!());
-    
-        match attr.name.local.to_string().to_lowercase().as_str() {
-            "type" => {
-                attr_info.name = attr.value.to_string();
-            }
-            "value" => {
-                attr_info.value = attr.value.to_string();
-            }
-            _ => {}
+        } else {
+            ret_vec.push(ch);
+            i += 1;
         }
     }
-    attr_info
-}
 
-fn match_value(handle: &Rc<Node>, modal: &Value, attr_val: &String) {
-    let disp_val = get_display_value(modal, attr_val);
-    
-    let mut text = StrTendril::new();
-    let mut text_str = String::from("");
-
-    if disp_val.is_string() {
-        text_str = String::from(disp_val.as_str().unwrap());
-    }
-    else if disp_val.is_boolean() {
-        text_str = disp_val.as_bool().unwrap().to_string();
-    }
-    else if disp_val.is_f64() {
-        text_str = disp_val.as_f64().unwrap().to_string();
-    }
-    else if disp_val.is_i64() {
-        text_str = disp_val.as_i64().unwrap().to_string();
-    }
-    else if disp_val.is_u64() {
-        text_str = disp_val.as_u64().unwrap().to_string();
-    }
-    else if disp_val.is_number() {
-        text_str = disp_val.as_number().unwrap().to_string();
-    }
-
-    if text_str == "" {
-        return;
-    }
-    
-    let text_handle = text.try_push_bytes(text_str.as_bytes());
-    match text_handle {
-        Ok(_) => {
-            handle.children.borrow_mut().insert(0, Node::new(NodeData::Text { contents: RefCell::new(text) }));
-        }
-        Err(_) => {}
-    }
-}
-
-fn match_if(handle: &Rc<Node>, modal: &Value, attr_val: &String) {
-    let disp_val = get_display_value(modal, attr_val);
-                        
-    if !disp_val.as_bool().unwrap() {
-        let mut children = handle.children.borrow_mut();
-
-        for _ in 0..children.len() {
-            children.remove(0);
-        }
-    }
-}
-
-fn match_foreach(dom: &RcDom, handle: &Rc<Node>, modal: &Value, opts: &ParseOpts, attr_info: AttrInfo, parent_children: &mut RefMut<'_, Vec<Rc<Node>>>) {
-    let disp_val = get_display_value(modal, &attr_info.value);
-                 
-    let base_handle_clone = clone_handle(opts, handle);
-    let clone_children = base_handle_clone.document.children.borrow_mut();
- 
-    // remove original node since it contains no relavent data
-    if let Some(pos) = parent_children.iter().position(|child| Rc::ptr_eq(child, handle)) {
-        parent_children.remove(pos);
-    }
-
-    for val in disp_val.as_array().unwrap() {
-        for child in clone_children.clone().iter() {
-            let child_clone = clone_handle(opts, child);
-
-            {
-                inner_process_document(dom, &child_clone.document, Some(parent_children), modal, val, opts);
-            }
-
-            for actual_child in child_clone.document.children.take() {
-                parent_children.push(actual_child);
-            }
-        }
-    }
+    String::from_utf8(ret_vec).unwrap_or_default()
 }
 
 fn get_display_value(modal: &Value, attr_val: &String) -> Value {
@@ -298,7 +223,26 @@ fn get_display_value(modal: &Value, attr_val: &String) -> Value {
 
     for val in val_split {
         if disp_val.is_object() {
-            disp_val = &disp_val[val];
+            if val.contains("[") {
+                let mut index_split = attr_val.splitn(2, '[');
+                if let (Some(key), Some(idx_str)) = (index_split.next(), index_split.next()) {
+                    disp_val = &disp_val[key];
+
+                    if disp_val.is_array() {
+                        let index = idx_str.parse::<usize>();
+
+                        match index {
+                            Ok(idx) => {
+                                disp_val = &disp_val.as_array().unwrap()[idx];
+                            }
+                            Err(_) => {}
+                        }
+                    }
+                }
+            }
+            else {
+                disp_val = &disp_val[val];
+            }
         }
         else {
             break;
@@ -307,21 +251,27 @@ fn get_display_value(modal: &Value, attr_val: &String) -> Value {
     disp_val.clone()
 }
 
-fn clone_handle(opts: &ParseOpts, child: &Rc<Node>) -> RcDom {
-    let result = node_to_string(child);
+fn get_display_string(modal: &Value, attr_val: &String) -> String {
+    let disp_val = get_display_value(modal, attr_val);
 
-    parse_fragment(
-        RcDom::default(), 
-        opts.clone(), 
-        QualName::new(None, ns!(html), local_name!("body")), 
-        vec![],
-    true)
-    .one(result)
-}
+    if disp_val.is_string() {
+        return String::from(disp_val.as_str().unwrap());
+    }
+    else if disp_val.is_boolean() {
+        return disp_val.as_bool().unwrap().to_string();
+    }
+    else if disp_val.is_f64() {
+        return disp_val.as_f64().unwrap().to_string();
+    }
+    else if disp_val.is_i64() {
+        return disp_val.as_i64().unwrap().to_string();
+    }
+    else if disp_val.is_u64() {
+        return disp_val.as_u64().unwrap().to_string();
+    }
+    else if disp_val.is_number() {
+        return disp_val.as_number().unwrap().to_string();
+    }
 
-fn node_to_string(child: &Rc<Node>) -> String {
-    let mut bytes = vec![];
-    let document_clone: SerializableHandle = child.clone().into();
-    serialize(&mut bytes, &document_clone, SerializeOpts::default()).unwrap();
-    String::from_utf8(bytes).unwrap()
+    String::new()
 }

@@ -1,7 +1,3 @@
-#[macro_use]
-extern crate html5ever;
-extern crate markup5ever_rcdom as rcdom;
-
 use actix_web::{self, main, web, App, HttpResponse, HttpServer};
 mod config;
 mod controllers;

@@ -10,7 +10,7 @@ pub fn get_header_value(req: HttpRequest, key: impl AsHeaderName) -> String {
 
     match header.unwrap().to_str() {
         Ok(value) => {
-            return value.to_string();
+            return String::from(value);
         }
         Err(_) => {
             return String::new();
