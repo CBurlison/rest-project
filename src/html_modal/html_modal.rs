@@ -71,7 +71,7 @@ fn parse_tokens(str: &String, modal: &Value, foreach_modal: &mut Vec<Option<Valu
                     let val = get_display_string(modal, &token_key);
                     ret_vec.extend_from_slice(val.as_bytes());
                 }
-                "foreachvalue" => {
+                "forvalue" => {
                     let mut parts = token_key.splitn(2, '.');
 
                     if let (Some(idx_str), key) = (parts.next(), parts.next()) {
@@ -83,7 +83,7 @@ fn parse_tokens(str: &String, modal: &Value, foreach_modal: &mut Vec<Option<Valu
                         }
                     }
                 }
-                "foreach" => {
+                "for" => {
                     while i < bytes_len && bytes[i] != b'{' { i += 1; }
 
                     if i < bytes_len && bytes[i] == b'{' {
@@ -111,7 +111,7 @@ fn parse_tokens(str: &String, modal: &Value, foreach_modal: &mut Vec<Option<Valu
                         }
                     }
                 }
-                "foreachforeach" => {
+                "forfor" => {
                     let mut parts = token_key.splitn(2, '.');
 
                     if let (Some(idx_str), Some(key)) = (parts.next(), parts.next()) {
@@ -172,7 +172,7 @@ fn parse_tokens(str: &String, modal: &Value, foreach_modal: &mut Vec<Option<Valu
                         }
                     }
                 }
-                "foreachif" => {
+                "forif" => {
                     let mut parts = token_key.splitn(2, '.');
                     if let (Some(idx_str), Some(key)) = (parts.next(), parts.next()) {
                         if let Ok(idx) = idx_str.parse::<usize>() {

@@ -43,21 +43,27 @@ pub async fn hello() -> impl Responder {
             this should not be here!
             }
             <br/><br/>
-            /@foreach:str_vec; Example
+            /@for:str_vec; Example
             <ul>
-            @foreach:str_vec;{
-                <li>/@foreachvalue:0; = @foreachvalue:0;</li>
+            @for:str_vec;{
+                <li>/@forvalue:0; = @forvalue:0;</li>
             }
             </ul>
             <br/><br/>
-            /@foreach:user_vec; Example
+            /@for:user_vec; Example
             <ul>
-            @foreach:user_vec;{
-                <li>/@foreachvalue:0.name; = @foreachvalue:0.name;</li>
+            @for:user_vec;{
+                <li>/@forvalue:0.name; = @forvalue:0.name;</li>
             
-                <br/>/@foreachforeach:0.user_vec; Example
-                @foreachforeach:0.user_vec;{
-                    <li>/@foreachvalue:1.name; = @foreachvalue:1.name;</li>
+                <br/>/@forfor:0.user_vec; Example
+                @forfor:0.user_vec;{
+                    <li>/@forvalue:1.name; = @forvalue:1.name;</li>
+                }
+                @forif:0.test_true;{
+                    <li>/@forif:0.test_true; Example</li>
+                }
+                @forif:0.test_false;{
+                    <li>/@forif:0.test_false; Example</li>
                 }
                 <br/>
             }
