@@ -222,15 +222,18 @@ fn get_display_value(modal: &Value, attr_val: &String) -> Value {
                         disp_val = &disp_val[key];
                     }
 
-                    if disp_val.is_array() {
-                        let index = key[0..key.len()-1].parse::<usize>();
+                    match disp_val {
+                        Value::Array(arr) => {
+                            let index = key[0..key.len()-1].parse::<usize>();
 
-                        match index {
-                            Ok(idx) => {
-                                disp_val = &disp_val.as_array().unwrap()[idx];
+                            match index {
+                                Ok(idx) => {
+                                    disp_val = &arr[idx];
+                                }
+                                Err(_) => {}
                             }
-                            Err(_) => {}
                         }
+                        _ => {}
                     }
                 }
             }
