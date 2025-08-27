@@ -14,9 +14,9 @@ fn parse(str: &String, modal: &Value, foreach_modal: &mut Vec<Option<Value>>) ->
     let mut escaped = false;
     let mut ret_vec: Vec<u8> = vec![];
     let bytes = str.as_bytes();
-    let mut i = 0;
     let bytes_len = bytes.len();
 
+    let mut i = 0;
     while i < bytes_len {
         let ch = bytes[i];
         if ch == b'/' {
@@ -215,7 +215,7 @@ fn get_display_value(modal: &Value, attr_val: &String) -> Value {
                 let mut index_split = val.split('[');
                 while let Some(key) = index_split.next() {
                     if key.len() == 0 {
-                        break;
+                        continue;
                     }
 
                     if !key.ends_with(']') {
