@@ -1,28 +1,16 @@
 use serde_json::Value;
 
-pub struct HtmlModalParser;
+pub fn process_string<T: serde::ser::Serialize>(
+    html: &String,
+    modal: &T) -> String
+{
+    let json_value: Value = serde_json::to_value(&modal).unwrap();
+    let mut foreach_vals: Vec<Option<Value>> = vec![];
 
-pub trait ModalParser {
-    fn process_string<T: serde::ser::Serialize>(
-        &self,
-        html: &String,
-        modal: &T) -> String;
+    parse(html, &json_value, &mut foreach_vals)
 }
 
-impl ModalParser for HtmlModalParser {
-    fn process_string<T: serde::ser::Serialize>(
-        &self,
-        html: &String,
-        modal: &T) -> String
-    {
-        let json_value: Value = serde_json::to_value(&modal).unwrap();
-        let mut foreach_vals: Vec<Option<Value>> = vec![];
-
-        parse_tokens(html, &json_value, &mut foreach_vals)
-    }
-}
-
-fn parse_tokens(str: &String, modal: &Value, foreach_modal: &mut Vec<Option<Value>>) -> String {
+fn parse(str: &String, modal: &Value, foreach_modal: &mut Vec<Option<Value>>) -> String {
     let mut escaped = false;
     let mut ret_vec: Vec<u8> = vec![];
     let bytes = str.as_bytes();
@@ -104,7 +92,7 @@ fn parse_tokens(str: &String, modal: &Value, foreach_modal: &mut Vec<Option<Valu
                         if let Some(arr) = disp_val.as_array() {
                             for val in arr.iter() {
                                 foreach_modal.push(Some(val.clone()));
-                                let parsed = parse_tokens(&inner, modal, foreach_modal);
+                                let parsed = parse(&inner, modal, foreach_modal);
                                 ret_vec.extend_from_slice(parsed.as_bytes());
                                 foreach_modal.pop();
                             }
@@ -138,7 +126,7 @@ fn parse_tokens(str: &String, modal: &Value, foreach_modal: &mut Vec<Option<Valu
                                     if let Some(arr) = disp_val.as_array() {
                                         for val2 in arr.iter() {
                                             foreach_modal.push(Some(val2.clone()));
-                                            let parsed = parse_tokens(&inner, modal, foreach_modal);
+                                            let parsed = parse(&inner, modal, foreach_modal);
                                             ret_vec.extend_from_slice(parsed.as_bytes());
                                             foreach_modal.pop();
                                         }
@@ -167,7 +155,7 @@ fn parse_tokens(str: &String, modal: &Value, foreach_modal: &mut Vec<Option<Valu
                         let disp_val = get_display_value(modal, &token_key);
 
                         if disp_val.as_bool().unwrap_or(false) {
-                            let parsed = parse_tokens(&inner, modal, foreach_modal);
+                            let parsed = parse(&inner, modal, foreach_modal);
                             ret_vec.extend_from_slice(parsed.as_bytes());
                         }
                     }
@@ -196,7 +184,7 @@ fn parse_tokens(str: &String, modal: &Value, foreach_modal: &mut Vec<Option<Valu
                                     let disp_val = get_display_value(fe_mod, &key.to_string());
 
                                     if disp_val.as_bool().unwrap_or(false) {
-                                        let parsed = parse_tokens(&inner, modal, foreach_modal);
+                                        let parsed = parse(&inner, modal, foreach_modal);
                                         ret_vec.extend_from_slice(parsed.as_bytes());
                                     }
                                 }
@@ -224,12 +212,18 @@ fn get_display_value(modal: &Value, attr_val: &String) -> Value {
     for val in val_split {
         if disp_val.is_object() {
             if val.contains("[") {
-                let mut index_split = attr_val.splitn(2, '[');
-                if let (Some(key), Some(idx_str)) = (index_split.next(), index_split.next()) {
-                    disp_val = &disp_val[key];
+                let mut index_split = val.split('[');
+                while let Some(key) = index_split.next() {
+                    if key.len() == 0 {
+                        break;
+                    }
+
+                    if !key.ends_with(']') {
+                        disp_val = &disp_val[key];
+                    }
 
                     if disp_val.is_array() {
-                        let index = idx_str[0..idx_str.len()-1].parse::<usize>();
+                        let index = key[0..key.len()-1].parse::<usize>();
 
                         match index {
                             Ok(idx) => {
