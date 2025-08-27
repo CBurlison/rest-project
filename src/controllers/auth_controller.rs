@@ -5,6 +5,7 @@ use super::super::helpers::http_helpers;
 use serde::Serialize;
 use super::super::html_modal::html_modal;
 use uuid::Uuid;
+// use std::time::{Duration, SystemTime};
 
 #[derive(Serialize)]
 struct User {
@@ -18,7 +19,8 @@ struct User {
     test_false: bool,
     str_vec: Vec<String>,
     user_vec: Vec<User>,
-    vec_vec: Vec<Vec<u64>>
+    vec_vec: Vec<Vec<u64>>,
+    test_f64: f64
 }
 
 pub async fn hello() -> impl Responder {
@@ -34,6 +36,8 @@ pub async fn hello() -> impl Responder {
             /@value:vec_vec[1][0]; Example <br/>@value:vec_vec[1][0];
             <br/><br/>
             /@value:user_vec[0].str_vec[2]; Example <br/>@value:user_vec[0].str_vec[2];
+            <br/><br/>
+            /@value:test_f64; Example <br/>@value:test_f64;
             <br/><br/>
             /@if:test_true; Example
             <br/>
@@ -87,6 +91,7 @@ pub async fn hello() -> impl Responder {
         test_false: false,
         str_vec: vec![String::from("str 1"), String::from("str 2"), String::from("str 3")],
         vec_vec: vec![vec![0,1,2], vec![3,4,5]],
+        test_f64: 1.23,
         user_vec: vec![User {
                 id: Uuid::new_v4().to_string(),
                 name: String::from("Test Name 2"),
@@ -98,6 +103,7 @@ pub async fn hello() -> impl Responder {
                 test_false: false,
                 str_vec: vec![String::from("str 4"), String::from("str 5"), String::from("str 6")],
                 vec_vec: vec![],
+                test_f64: 1.23,
                 user_vec: vec![User {
                     id: Uuid::new_v4().to_string(),
                     name: String::from("Test Name 4"),
@@ -109,6 +115,7 @@ pub async fn hello() -> impl Responder {
                     test_false: false,
                     str_vec: vec![String::from("str 4"), String::from("str 5"), String::from("str 6")],
                     vec_vec: vec![],
+                    test_f64: 1.23,
                     user_vec: vec![]
                 }]
             },
@@ -123,11 +130,21 @@ pub async fn hello() -> impl Responder {
                 test_false: false,
                 str_vec: vec![String::from("str 1"), String::from("str 1"), String::from("str 1")],
                 vec_vec: vec![],
+                test_f64: 1.23,
                 user_vec: vec![]
             }]
     };
 
+    // let now = SystemTime::now();
+    
     let result = html_modal::process_string(&html, &user);
+
+    // match now.elapsed() {
+    //     Ok(elapsed) => {
+    //         println!("{} ms", elapsed.as_nanos() as f64 / 1000000f64);
+    //     }
+    //     Err(_) => {}
+    // }
     
     HttpResponse::Ok().body(result)
 }

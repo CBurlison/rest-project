@@ -4,7 +4,7 @@ pub fn process_string<T: serde::ser::Serialize>(
     html: &String,
     modal: &T) -> String
 {
-    let json_value: Value = serde_json::to_value(&modal).unwrap();
+    let json_value: Value = serde_json::to_value(&modal).unwrap_or_default();
     let mut foreach_vals: Vec<Option<Value>> = vec![];
 
     parse(html, &json_value, &mut foreach_vals)
@@ -248,24 +248,18 @@ fn get_display_value(modal: &Value, attr_val: &String) -> Value {
 fn get_display_string(modal: &Value, attr_val: &String) -> String {
     let disp_val = get_display_value(modal, attr_val);
 
-    if disp_val.is_string() {
-        return String::from(disp_val.as_str().unwrap());
+    match disp_val {
+        Value::String(val) => {
+            return val;
+        }
+        Value::Bool(val) => {
+            return val.to_string();
+        }
+        Value::Number(val) => {
+            return val.to_string();
+        }
+        _ => {
+            return String::new();
+        }
     }
-    else if disp_val.is_boolean() {
-        return disp_val.as_bool().unwrap().to_string();
-    }
-    else if disp_val.is_f64() {
-        return disp_val.as_f64().unwrap().to_string();
-    }
-    else if disp_val.is_i64() {
-        return disp_val.as_i64().unwrap().to_string();
-    }
-    else if disp_val.is_u64() {
-        return disp_val.as_u64().unwrap().to_string();
-    }
-    else if disp_val.is_number() {
-        return disp_val.as_number().unwrap().to_string();
-    }
-
-    String::new()
 }
