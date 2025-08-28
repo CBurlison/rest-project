@@ -1,4 +1,5 @@
 use actix_web::{self, main, web, App, HttpResponse, HttpServer};
+use async_std::task;
 mod config;
 mod controllers;
 mod helpers;
@@ -6,7 +7,7 @@ mod html_modal;
 
 #[main]
 async fn main() -> std::io::Result<()> {
-    // config::db::config_db();
+    task::block_on(config::db::config_db());
 
     HttpServer::new(|| {
         App::new()
