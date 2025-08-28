@@ -139,10 +139,12 @@ fn parse(str: &String, modal: &Value, foreach_modal: &mut Vec<Option<Value>>) ->
 fn parse_token_type(bytes: &[u8], bytes_len: usize, ret_vec: &mut Vec<u8>, i: &mut usize) -> String {
     let mut token_type: Vec<u8> = vec![];
     while *i < bytes_len && bytes[*i] != b':' {
-        token_type.push(bytes[*i]);
+        let byte = bytes[*i];
+
+        token_type.push(byte);
         *i += 1;
 
-        if token_type.len() >= MAX_TOKEN_LEN {
+        if token_type.len() >= MAX_TOKEN_LEN || byte == b' ' {
             ret_vec.extend_from_slice(&token_type);
             Default::default()
         }
@@ -163,10 +165,12 @@ fn parse_token_type(bytes: &[u8], bytes_len: usize, ret_vec: &mut Vec<u8>, i: &m
 fn parse_token_key(bytes: &[u8], bytes_len: usize, ret_vec: &mut Vec<u8>, i: &mut usize) -> String {
     let mut token_key: Vec<u8> = vec![];
     while *i < bytes_len && bytes[*i] != b';' && bytes[*i] != b'{' {
-        token_key.push(bytes[*i]);
+        let byte = bytes[*i];
+
+        token_key.push(byte);
         *i += 1;
 
-        if token_key.len() >= MAX_TOKEN_LEN {
+        if token_key.len() >= MAX_TOKEN_LEN || byte == b' ' {
             ret_vec.extend_from_slice(&token_key);
             Default::default()
         }
