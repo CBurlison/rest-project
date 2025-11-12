@@ -1,53 +1,54 @@
 <!DOCTYPE html>
 <meta charset="utf-8">
 <title>Hello, world!</title>
+
 <body>
-    \@value:name; Example <br/>@value:name;
-    <br/><br/>
-    \@value:str_vec[2]; Example <br/>@value:str_vec[2];
-    <br/><br/>
-    \@value:vec_vec[1][0]; Example <br/>@value:vec_vec[1][0];
-    <br/><br/>
-    \@value:user_vec[0].str_vec[2]; Example <br/>@value:user_vec[0].str_vec[2];
-    <br/><br/>
-    \@value:test_f64; Example <br/>@value:test_f64;
-    <br/><br/>
+    \@value:name; Example <br />@value:name;
+    <br /><br />
+    \@value:str_vec[2]; Example <br />@value:str_vec[2];
+    <br /><br />
+    \@value:vec_vec[1][0]; Example <br />@value:vec_vec[1][0];
+    <br /><br />
+    \@value:user_vec[0].str_vec[2]; Example <br />@value:user_vec[0].str_vec[2];
+    <br /><br />
+    \@value:test_f64; Example <br />@value:test_f64;
+    <br /><br />
     \@if:test_true; Example
-    <br/>
+    <br />
     @if:test_true;{
     this is displaying!
     }
-    <br/><br/>
+    <br /><br />
     \@if:test_false; Example
-    <br/>
+    <br />
     @if:test_false;{
-    <br/>
+    <br />
     this should not be here!
     }
-    <br/><br/>
+    <br /><br />
     \@for:str_vec; Example
     <ul>
-    @for:str_vec;{
+        @for:str_vec;{
         <li>\@forvalue:0; = @forvalue:0;</li>
-    }
+        }
     </ul>
-    <br/><br/>
+    <br /><br />
     \@for:user_vec; Example
     <ul>
-    @for:user_vec;{
+        @for:user_vec;{
         <li>\@forvalue:0.name; = @forvalue:0.name;</li>
-    
-        <br/>\@forfor:0.user_vec; Example
+
+        <br />\@forfor:0.user_vec; Example
         @forfor:0.user_vec;{
-            <li>\@forvalue:1.name; = @forvalue:1.name;</li>
+        <li>\@forvalue:1.name; = @forvalue:1.name;</li>
         }
         @forif:0.test_true;{
-            <li>\@forif:0.test_true; Example</li>
+        <li>\@forif:0.test_true; Example</li>
         }
         @forif:0.test_false;{
-            <li>\@forif:0.test_false; Example</li>
+        <li>\@forif:0.test_false; Example</li>
         }
-        <br/>
-    }
+        <br />
+        }
     </ul>
 </body>
